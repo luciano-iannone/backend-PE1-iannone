@@ -1,14 +1,12 @@
-///___________________PRODUCTS________________________
+///------------------------------REST--------------------------------
+###
+get http://localhost:8080/api/carts/6580f6baf3830e76e033843e
 
-GET http://localhost:8080/api/products
+### 
+post http://localhost:8080/api/carts/6580f6baf3830e76e033843e/product/1
 
-###
-GET http://localhost:8080/api/products/MARCOAURELIO
-###
-post http://localhost:8080/api/products
-###
-put http://localhost:8080/api/products/GENGHISKHAN
-###
-delete http://localhost:8080/api/products/GENGHISKHAN
+### 
+post http://localhost:8080/api/carts/
 
-///__________________CARTS____________________________
+### 
+post http://localhost:8080/api/carts/6580f6baf3830e76e033843e/product/1

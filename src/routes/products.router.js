@@ -1,93 +1,90 @@
-const { Router } = require('express')
-const ProductManager = require('../managers/productsManager')
-const productManager = new ProductManager('../data/products.json')
-const router = Router()
+const express = require('express');
+const { ProductMongo } = require('../daos/mongo/products.daomongo');
 
+const router = express.Router();
+const products = new ProductMongo();
 
-router.use((err, req, res, next) => {
-    console.error(err)
-    res.status(500).send('Error interno del servidor')
-})
+const handleAsync = (fn) => (req, res, next) =>
+    Promise.resolve(fn(req, res, next)).catch((error) => {
+        res.status(400).json({ status: 'fail', payload: error.message || 'Error desconocido' });
+    });
 
-router
-    .get('/', async (req, res, next) => {
-        try {
-            await productManager.readFromFile()
-            const limit = parseInt(req.query.limit)
-            const allProducts = await productManager.getProducts()
+const sendSuccess = (res, payload) => {
+    res.status(200).json({ status: 'ok', payload });
+};
 
-            if (!isNaN(limit)) {
-                const limitedProducts = allProducts.slice(0, limit)
-                res.json(limitedProducts)
-            } else {
-                res.json(allProducts)
-            }
-        } catch (error) {
-            next(error)
-        }
-    })
+// GET http://localhost:8080/api/products + ?limit=X
+router.get('/', handleAsync(async (req, res) => {
+    let { limit } = req.query;
+    const getProducts = await products.getProducts();
 
-    .get('/:pid', async (req, res, next) => {
-        const id = parseInt(req.params.pid)
-        try {
-            await productManager.readFromFile()
-            const product = productManager.getProductById(id)
+    if (!limit || limit > getProducts.length) {
+        sendSuccess(res, getProducts);
+    } else {
+        sendSuccess(res, getProducts.slice(0, limit));
+    }
+}));
 
-            if (product) {
-                res.json(product)
-            } else {
-                res.status(404).send('Producto no encontrado')
-            }
-        } catch (error) {
-            next(error)
-        }
-    })
+// GET http://localhost:8080/api/products/:pid
+router.get('/:pid', handleAsync(async (req, res) => {
+    const pid = req.params.pid;
+    const getProducts = await products.getProductsById(pid);
 
-    .put('/:id', async (req, res, next) => {
-        const productId = parseInt(req.params.id)
+    if (typeof (getProducts) === 'string') {
+        res.status(404).json({ status: 'fail', payload: getProducts });
+    } else {
+        sendSuccess(res, getProducts);
+    }
+}));
 
-        if (isNaN(productId)) {
-            return res.status(400).json({ error: 'ID no válido.' })
-        }
+// POST http://localhost:8080/api/products/ + body: whole product
+router.post('/', handleAsync(async (req, res) => {
+    const newProduct = req.body;
+    const resp = await products.addProduct(newProduct);
 
-        const updatedProductData = req.body
+    if (typeof (resp) === 'string') {
+        res.status(400).json({ status: 'fail', payload: resp });
+    } else {
+        sendSuccess(res, resp);
+    }
+}));
 
-        try {
-            await productManager.updateProduct(productId, updatedProductData)
-            res.json({ message: `Producto con ID ${productId} actualizado con éxito.` })
-        } catch (error) {
-            next(error)
-        }
-    })
+// PUT http://localhost:8080/api/products/:pid + body: whole product
+router.put('/:pid', handleAsync(async (req, res) => {
+    const pid = req.params.pid;
+    const changedProduct = req.body;
+    const resp = await products.updateProduct(pid, changedProduct);
 
-    .delete('/:id', async (req, res, next) => {
-        const productId = parseInt(req.params.id)
-        if (isNaN(productId)) {
-            return res.status(400).json({ error: 'ID no válido.' })
-        }
+    if (typeof (resp) === 'string') {
+        res.status(400).json({ status: 'fail', payload: resp });
+    } else {
+        sendSuccess(res, resp);
+    }
+}));
 
-        try {
-            const result = await productManager.deleteProduct(productId)
-            res.json(result)
-        } catch (error) {
-            next(error)
-        }
-    })
+// DELETE http://localhost:8080/api/products/:pid
+router.delete('/:pid', handleAsync(async (req, res) => {
+    const pid = req.params.pid;
+    const resp = await products.deleteProductById(pid);
 
-    .post('/', async (req, res, next) => {
-        const { title, description, price, thumbnail, code, stock, status, category } = req.body
+    if (typeof (resp) === 'string') {
+        res.status(400).json({ status: 'fail', payload: resp });
+    } else {
+        sendSuccess(res, resp);
+    }
+}));
 
-        if (!title || !description || !price || !code || !stock || !status || !category) {
-            return res.status(400).json({ error: 'Todos los campos son requeridos.' })
-        }
+// DELETE http://localhost:8080/api/products?code=x
+router.delete('/', handleAsync(async (req, res) => {
+    const pcode = req.query.code;
+    const resp = await products.deleteProductByCode(pcode);
 
-        try {
-            await productManager.addProduct(title, description, price, thumbnail, code, stock, status, category)
-            res.status(201).json({ message: 'Producto agregado exitosamente.' })
-        } catch (error) {
-            next(error)
-        }
-    })
+    if (typeof (resp) === 'string') {
+        res.status(400).json({ status: 'fail', payload: resp });
+    } else {
+        sendSuccess(res, resp);
+    }
+}));
 
-module.exports = router
+module.exports = router;
 
